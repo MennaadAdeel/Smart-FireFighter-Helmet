@@ -1,31 +1,31 @@
-# sim7600.py
-import time
-import serial
-
+import asyncio
+import aioserial
+import aiomqtt
 
 class GSMModule:
     def __init__(self, serial_port, baudrate):
-        self.ser = serial.Serial(serial_port, baudrate, timeout=5)
+        # Use aioserial for asynchronous serial communication
+        self.ser = aioserial.AioSerial(serial_port, baudrate, timeout=5)
 
-    def send_at_command(self, command, delay=1):
+    async def send_at_command(self, command, delay=1):
         """
         Send an AT command to the SIM7600 module and return the response.
         """
         self.ser.write((command + "\r\n").encode())
-        time.sleep(delay)
-        response = self.ser.readlines()
+        await asyncio.sleep(delay)
+        response = await self.ser.readlines()
         return [line.decode('utf-8').strip() for line in response]
 
-    def get_gps_location(self):
+    async def get_gps_location(self):
         """
         Retrieve GPS location using the SIM7600 module.
         """
         # Enable GPS
-        self.send_at_command("AT+CGNSPWR=1")
-        time.sleep(2)
+        await self.send_at_command("AT+CGNSPWR=1")
+        await asyncio.sleep(2)
 
         # Get GPS Information
-        gps_response = self.send_at_command("AT+CGNSINF")
+        gps_response = await self.send_at_command("AT+CGNSINF")
         for line in gps_response:
             if "+CGNSINF" in line:
                 data = line.split(",")
@@ -35,11 +35,11 @@ class GSMModule:
                     return {"latitude": latitude, "longitude": longitude}
         return None
 
-    def get_signal_strength(self):
+    async def get_signal_strength(self):
         """
         Get the signal strength of the GSM connection.
         """
-        response = self.send_at_command("AT+CSQ")
+        response = await self.send_at_command("AT+CSQ")
         for line in response:
             if "+CSQ" in line:
                 try:
@@ -49,25 +49,26 @@ class GSMModule:
                     return 0
         return 0
 
-    def is_connected(self):
+    async def is_connected(self):
         """
         Check if the GSM module is connected to a network.
         """
-        response = self.send_at_command("AT+CGATT?")
+        response = await self.send_at_command("AT+CGATT?")
         return any("1" in line for line in response)
 
-    def restart(self):
+    async def restart(self):
         """
         Restart the GSM module.
         """
-        self.send_at_command("AT+CFUN=1,1")  # Reset module
-        time.sleep(10)
+        await self.send_at_command("AT+CFUN=1,1")  # Reset module
+        await asyncio.sleep(10)
 
-    def send_data(self, client, topic, data):
+    async def send_data(self, client, topic, data):
         """
-        Send data using MQTT.
+        Send data using MQTT asynchronously.
         """
         try:
-            client.publish(topic, data)
+            await client.publish(topic, data)
         except Exception as e:
             print(f"Failed to send data: {e}")
+

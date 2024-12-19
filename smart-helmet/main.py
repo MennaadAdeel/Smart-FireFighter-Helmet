@@ -12,16 +12,17 @@ from sensors.imu_sensor import IMUSensor
 from mqtt.mqtt_module import *
 #from sreaming.camera_stream import *
 
+# GSM module's config
+SERIAL_PORT = '/dev/ttyS0'  
+BAUDRATE = 115200
+
 
 
 class HelmetApp:
     def __init__(self):
         # Initialize sensors
-        self.imu = IMUSensor(i2c=board.I2C())
-        self.temp = TemperatureSensor(i2c=board.I2C())
+        self.gsm = GSMModule(SERIAL_PORT, BAUDRATE)
         self.co = COSensor(i2c_1=0x01, address=0x74)
-        self.gsm = GSMModule()
-        self.lora = LoRaModule()
 
     async def check_connectivity(self):
         for _ in range(3):  # Try 3 times

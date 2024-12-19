@@ -1,6 +1,5 @@
+import asyncio
 from DFRobot_MultiGasSensor import *
-import serial
-import time
 
 
 class COSensor:
@@ -9,7 +8,17 @@ class COSensor:
         self.address = address
         self.sensor = DFRobot_MultiGasSensor_I2C(i2c_1, address)
 
-    def read_co_sensor(self):
-        con = self.sensor.read_gas_concentration()
+    async def read_co_sensor(self):
+        # Use asyncio.to_thread to run the blocking read in a separate thread
+        con = await asyncio.to_thread(self.sensor.read_gas_concentration)
         gas_data = {"concentration": con}
         return gas_data
+
+
+async def main():
+    co_sensor = COSensor(i2c_1, address)
+    data = await co_sensor.read_co_sensor()
+    print(data)
+
+# Run the main function
+asyncio.run(main())
