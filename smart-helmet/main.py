@@ -110,37 +110,41 @@ class HelmetApp:
                 
             # Receive data from ESP32_LoRa (IMU , Temp)
             imu_temp_data = await self.bt_manager.communicate_with_device("ESP32_LoRa")
-            mqtt_message["imu"] = imu_temp_data   # Append IMU and Temp to MQTT message
+            if imu_temp_data:
+                mqtt_message["imu"] = imu_temp_data   # Append IMU and Temp to MQTT message
+            else:
+                logging.error("Failed to get IMU and Temp data.")
             
             # Receive data from ESP32_Flash_1 
             flash1_data = await self.bt_manager.communicate_with_device("ESP32_Flash_1")
-            flash_to_Heartrate['flash1'] = flash1_data # Append Flash1 data to Heart rate
+            if flash1_data:
+                flash_to_Heartrate['flash1'] = flash1_data # Append Flash1 data to Heart rate
+            else:
+                logging.error("Failed to get Flash1 data.")
             
             # Receive data from ESP32_Flash_2
             flash2_data, flash2_co = await self.bt_manager.communicate_with_device("ESP32_Flash_2")
-            flash_to_Heartrate['flash2'] = flash2_data # Append Flash2 data to Heart rate
-            flash_to_Heartrate['co'] = flash2_co        # Append CO data to Heart rate
-            
+            if flash2_data:
+                flash_to_Heartrate['flash2'] = flash2_data # Append Flash2 data to Heart rate
+                flash_to_Heartrate['co'] = flash2_co        # Append CO data to Heart rate
+            else:
+                logging.error("Failed to get Flash2 data.")
+                
             # Send data to heart rate module
             await self.bt_manager.communicate_with_device("ESP32_HeartRate", flash_to_Heartrate)
             
             # Receive data from heart rate module
             heartrate_data = await self.bt_manager.communicate_with_device("ESP32_HeartRate")
-            mqtt_message['heartrate'] = heartrate_data    # Append Heart rate data to MQTT message
-            
+            if heartrate_data:
+                mqtt_message['heartrate'] = heartrate_data    # Append Heart rate data to MQTT message
+            else:
+                logging.error("Failed to get Heart rate data.")
+                
         except Exception as e:
             logging.error(f"Error collecting sensor data: {e}")
 
-    async def publish_data_to_mqtt(self):
-        try:
-            await publish_data(self.client, broker_topic, mqtt_message)
-            logging.info(f"Published data to MQTT: {mqtt_message}")
-        except Exception as e:
-            logging.error(f"Error publishing data: {e}")
-        
-        # Clear the data after publishing
-        flash_to_Heartrate.clear()
-        mqtt_message.clear()
+    
+      
 
     async def run(self):
         # Start MediaMTX process asynchronously
@@ -148,14 +152,18 @@ class HelmetApp:
         
         while True:
             await self.check_connectivity()
-            await asyncio.sleep(5)  # Check every 5 seconds
+            await asyncio.sleep(1)  # Give some time to connect
             
             # Collect sensor data
             await self.collect_sensor_data()
             
             # Publish data to MQTT
-            await self.publish_data_to_mqtt()
+            await self.publish_data(self.client, broker_topic, mqtt_message)
             await asyncio.sleep(1)  # Give some time before repeating
+            
+            # Clear the data after publishing
+            flash_to_Heartrate.clear()
+            mqtt_message.clear()
 
 
 if __name__ == "__main__":
