@@ -13,8 +13,13 @@ class GSMModule:
         """
         self.ser.write((command + "\r\n").encode())
         await asyncio.sleep(delay)
-        response = await self.ser.readlines()
-        return [line.decode('utf-8').strip() for line in response]
+
+        response_lines = []
+        while self.ser.in_waiting:
+            line = await self.ser.readline_async()
+            response_lines.append(line.decode('utf-8').strip())
+
+        return response_lines
 
     async def get_gps_location(self):
         """
@@ -32,7 +37,7 @@ class GSMModule:
                 if len(data) > 4 and data[3] and data[4]:
                     latitude = data[3]
                     longitude = data[4]
-                    return {"latitude": latitude, "longitude": longitude}
+                    return latitude,longitude
         return None
 
     async def get_signal_strength(self):
@@ -71,4 +76,3 @@ class GSMModule:
             await client.publish(topic, data)
         except Exception as e:
             print(f"Failed to send data: {e}")
-

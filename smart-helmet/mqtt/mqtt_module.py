@@ -1,51 +1,58 @@
-import asyncio
+import paho.mqtt.client as mqtt
 import json
 import logging
-from gmqtt import Client as MQTTClient
+import time
 
 # Configure logging
-logging.basicConfig(filename='mqtt_connection.log', level=logging.INFO, format='%(asctime)s - %(message)s')
+logging.basicConfig(filename='mqtt_connection.log', level=logging.INFO, 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Define on_connect callback
-async def on_connect(client, userdata, flags, rc):
+def on_connect(client, userdata, flags, rc):
     if rc == 0:
         logging.info("Connected to the broker successfully.")
+        userdata['connected'] = True
     else:
         logging.error(f"Failed to connect. Return code: {rc}")
+        userdata['connected'] = False
 
-# Initialize MQTT client
-async def init_Mqtt_Client(broker_address, broker_port, client_id):
-    client = MQTTClient(client_id)
-    client.on_connect = on_connect  # Set the on_connect callback
+
+def on_disconnect(client, userdata, rc):
+    if rc != 0:
+        logging.warning("Unexpected disconnection.")
+    userdata['connected'] = False
+
+
+def init_mqtt_client(broker_address, broker_port, client_id):
+    client = mqtt.Client(client_id)
+    client.user_data_set({'connected': False})
+    client.on_connect = on_connect
+    client.on_disconnect = on_disconnect
+
     try:
-        await client.connect(broker_address, broker_port)
+        logging.info("Attempting to connect to the broker...")
+        client.connect(broker_address, broker_port, 60)
     except Exception as e:
         logging.error(f"Error connecting to the broker: {e}")
+    
     return client
 
-# Publish data
-async def publish_data(client, topic, data):
-    json_data = json.dumps(data)
-    await client.publish(topic, json_data)
 
-# Main function to run the MQTT client and publish data
-async def main():
-    broker_address = "your_broker_address"
-    broker_port = 1883
-    client_id = "your_client_id"
-    
-    # Initialize MQTT client
-    client = await init_Mqtt_Client(broker_address, broker_port, client_id)
-    
-    # Example data to publish
-    data = {"key": "value"}
-    
-    # Publish the data
-    await publish_data(client, "your_topic", data)
+def publish_data(client, topic, data):
+    try:
+        json_data = json.dumps(data)
+        result = client.publish(topic, json_data)
+        if result.rc == mqtt.MQTT_ERR_SUCCESS:
+            logging.info(f"Data published to topic '{topic}': {data}")
+        else:
+            logging.warning(f"Failed to publish data to topic '{topic}': {result.rc}")
+    except Exception as e:
+        logging.error(f"Error while publishing data: {e}")
 
-    # Run the client loop
-    await client.loop_forever()
 
-# Start the asyncio event loop
-if __name__ == "__main__":
-    asyncio.run(main())
+def reconnect_if_needed(client):
+    if not client._userdata['connected']:
+        try:
+            logging.info("Reconnecting to the broker...")
+            client.reconnect()
+        except Exception as e:
+            logging.error(f"Error while reconnecting: {e}")
