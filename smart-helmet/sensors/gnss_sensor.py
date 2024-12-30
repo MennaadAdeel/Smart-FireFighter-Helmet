@@ -76,3 +76,9 @@ class GSMModule:
             await client.publish(topic, data)
         except Exception as e:
             print(f"Failed to send data: {e}")
+            
+            
+            
+            
+            
+            
